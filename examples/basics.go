@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"gchat"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	ws "nhooyr.io/websocket"
+	"time"
 )
 
 func main() {
@@ -19,16 +21,31 @@ func main() {
 			ctx.JSON(http.StatusInternalServerError, err.Error())
 			return
 		}
-		Conn.CloseRead(ctx)
 		//g.AddUser(896).AddClient(0,Conn)
-		g.AddClient(242, &gchat.Client{
-			Id: 0,
-			Ws: Conn,
-		})
-		//defer SConn.Close(ws.StatusNormalClosure, "")
+		//ct, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(3 * time.Second)
+			fmt.Printf("关闭\n")
+			Conn.Close(ws.StatusNormalClosure, "")
+		}()
+		go func(c context.Context) {
+			fmt.Println("监听")
+			_, _, errRead := Conn.Reader(c)
+			errStart := ws.CloseStatus(errRead)
+			fmt.Printf("errStart:%s\n", errStart)
+			switch errStart {
+			case ws.StatusNormalClosure:
+				fmt.Println("正常退出")
+			}
+			fmt.Println("监听结束")
+			return
+		}(ctx)
+		fmt.Println("结束")
 	})
 	srv.GET("/list", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, g.UserPool)
+
+		ctx.AbortWithStatus(http.StatusMultiStatus)
+		ctx.JSON(http.StatusOK, g.GetAllUser())
 	})
 
 	err2 := srv.Run(":9011")
